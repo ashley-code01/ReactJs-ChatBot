@@ -3,6 +3,7 @@ import Groq from 'groq-sdk';
 import ChatBotIcon from './components/ChatBotIcon';
 import ChatForm from './components/ChatForm';
 import ChatMessage from './components/ChatMessage';
+import { sendMessageToBackend, checkBackendHealth } from './services/api';
 
 // Constants
 const MODEL_NAME = 'llama-3.3-70b-versatile';
@@ -30,7 +31,22 @@ const App = () => {
   const [chatHistory, setChatHistory] = useState([INITIAL_MESSAGE]);
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(true);
+  const [backendHealthy, setBackendHealthy] = useState(false);
   const chatBodyRef = useRef(null);
+
+  // Check backend health on mount
+  useEffect(() => {
+    const checkHealth = async () => {
+      const healthy = await checkBackendHealth();
+      setBackendHealthy(healthy);
+      if (!healthy) {
+        console.warn('⚠️ Backend is offline. Messages will not be saved.');
+      } else {
+        console.log('✅ Backend is connected and healthy!');
+      }
+    };
+    checkHealth();
+  }, []);
 
   useEffect(() => {
     if (chatBodyRef.current) {
@@ -54,6 +70,13 @@ const App = () => {
       { ...THINKING_MESSAGE, id: Date.now() },
     ]);
     setIsLoading(true);
+
+    // Save user message to backend (non-blocking)
+    if (backendHealthy) {
+      sendMessageToBackend(userMessage, 'user', 'user_input').catch((err) =>
+        console.error('Failed to save user message:', err)
+      );
+    }
 
     try {
       const apiKey = import.meta.env.VITE_GROQ_API_KEY;
@@ -81,10 +104,18 @@ const App = () => {
       });
 
       const botResponse = chatCompletion.choices[0]?.message?.content || 'Sorry, no response received.';
+
       setChatHistory((prev) => [
         ...prev.filter((chat) => chat.text !== THINKING_MESSAGE.text),
         { type: 'model', text: botResponse, timestamp: Date.now() },
       ]);
+
+      // Save bot response to backend (non-blocking)
+      if (backendHealthy) {
+        sendMessageToBackend(botResponse, 'assistant', 'groq').catch((err) =>
+          console.error('Failed to save bot response:', err)
+        );
+      }
     } catch (error) {
       console.error('Error fetching Groq response:', error);
       setChatHistory((prev) => [
@@ -98,12 +129,34 @@ const App = () => {
 
   return (
     <div className="container">
+      {/* Backend status indicator (optional - remove if you don't want it) */}
+      {!backendHealthy && (
+        <div style={{
+          position: 'fixed',
+          top: '10px',
+          right: '10px',
+          background: '#ff9800',
+          color: 'white',
+          padding: '8px 12px',
+          borderRadius: '4px',
+          fontSize: '12px',
+          zIndex: 10000,
+        }}>
+          ⚠️ Backend offline - messages won't be saved
+        </div>
+      )}
+
       {isOpen ? (
         <div className="chatbot-popup">
           <div className="chat-header">
             <div className="header-info">
               <ChatBotIcon />
               <h2 className="logo-text">AI Assistant</h2>
+              {backendHealthy && (
+                <span style={{ fontSize: '10px', color: '#4caf50', marginLeft: '8px' }}>
+                  ● Connected
+                </span>
+              )}
             </div>
             <button
               className="material-symbols-rounded"

@@ -1,0 +1,13 @@
+# Phase 1 Requirements - Minimal Backend Setup
+# These are all that's needed to get the backend working
+
+flask==3.0.0
+flask-cors==4.0.0
+python-dotenv==1.0.0
+requests==2.31.0
+sqlalchemy==2.0.25
+pydantic==2.5.3
+
+# Note: NLP packages (spaCy, sentence-transformers, chromadb) 
+# will be added in Phase 2 when we actually need them
+# This keeps Phase 1 simple and avoids Windows build issues
